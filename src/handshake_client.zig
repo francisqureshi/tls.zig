@@ -41,6 +41,8 @@ pub const Options = struct {
     /// host name.
     insecure_skip_verify: bool = false,
 
+    expected_peer_key: ?common.PeerPublicKey = null,
+
     /// List of cipher suites to use.
     /// To use just tls 1.3 cipher suites:
     ///   .cipher_suites = &tls.CipherSuite.tls13,
@@ -252,6 +254,10 @@ pub const Handshake = struct {
     const Self = @This();
 
     fn initKeys(h: *Self, opt: Options) !void {
+        // Prototype is deliberately limited to full verified handshakes.
+        if (opt.expected_peer_key != null and
+            (opt.insecure_skip_verify or opt.session_resumption != null))
+            return error.TlsIllegalParameter;
         const init_keys_buf_len = 32 + 46 + DhKeyPair.seed_len;
         var buf: [init_keys_buf_len]u8 = undefined;
         opt.rng.bytes(&buf);
@@ -263,6 +269,7 @@ pub const Handshake = struct {
         h.cert = .{
             .host = opt.host,
             .root_ca = opt.root_ca,
+            .expected_peer_key = opt.expected_peer_key,
             .skip_verify = opt.insecure_skip_verify,
             .now_sec = opt.now.toSeconds(),
         };

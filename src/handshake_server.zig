@@ -36,6 +36,8 @@ pub const Options = struct {
     /// Client certificate will be verified with root_ca certificates.
     client_auth: ?ClientAuth = null,
 
+    expected_peer_key: ?common.PeerPublicKey = null,
+
     /// List of supported tls 1.3 cipher suites
     cipher_suites: []const CipherSuite = cipher_suites.tls13,
 
@@ -153,6 +155,9 @@ pub const Handshake = struct {
     }
 
     fn clientFlight2(h: *Self, opt: Options) !void {
+        if (opt.expected_peer_key != null and
+            (opt.client_auth == null or opt.client_auth.?.auth_type != .require))
+            return error.TlsIllegalParameter;
         // calculate application cipher before updating transcript in readClientFlight2
         const application_secret = h.transcript.applicationSecret();
         const app_cipher = try Cipher.initTls13(h.cipher_suite, application_secret, .server);
@@ -251,6 +256,7 @@ pub const Handshake = struct {
         if (opt.client_auth) |client_auth| {
             crt_parser = .{
                 .root_ca = client_auth.root_ca,
+                .expected_peer_key = opt.expected_peer_key,
                 .host = "",
                 .now_sec = opt.now.toSeconds(),
             };

@@ -312,7 +312,15 @@ fn SchemeEcdsa(comptime scheme: proto.SignatureScheme) type {
     };
 }
 
+/// Expected leaf key, borrowed until the handshake finishes. This supplements
+/// normal certificate verification; it does not replace proof of possession.
+pub const PeerPublicKey = struct {
+    algorithm: Certificate.Parsed.PubKeyAlgo,
+    bytes: []const u8,
+};
+
 pub const CertificateParser = struct {
+    expected_peer_key: ?PeerPublicKey = null,
     pub_key_algo: Certificate.Parsed.PubKeyAlgo = undefined,
     pub_key_buf: [1038]u8 = undefined,
     pub_key: []const u8 = undefined,
@@ -363,6 +371,11 @@ pub const CertificateParser = struct {
                 }
                 h.pub_key = try dupe(&h.pub_key_buf, subject.pubKey());
                 h.pub_key_algo = subject.pub_key_algo;
+                if (h.expected_peer_key) |expected| {
+                    if (!std.meta.eql(expected.algorithm, h.pub_key_algo) or
+                        !mem.eql(u8, expected.bytes, h.pub_key))
+                        return error.TlsPeerKeyMismatch;
+                }
                 last_cert = subject;
             }
             if (!h.skip_verify) {
