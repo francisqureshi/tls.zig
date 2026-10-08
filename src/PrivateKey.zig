@@ -36,6 +36,7 @@ pub fn parsePem(buf: []const u8) !PrivateKey {
     // required bytes:
     // 2412, 1821, 1236 for rsa 4096, 3072, 2048 bits size keys
     var decoded: [4096]u8 = undefined;
+    defer std.crypto.secureZero(u8, &decoded);
     const n = try base64.decode(&decoded, encoded);
 
     if (marker_version == 2) {
